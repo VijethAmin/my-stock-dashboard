@@ -1,76 +1,158 @@
+# 📊 Cloud-Based Stock Market Dashboard
 
-# 📊 Stock Market Forecasting and Analysis Dashboard
+## 🚀 Overview
 
-## 📌 Introduction
-This project is an **interactive dashboard** built with Streamlit for **real-time stock market analysis and forecasting**.  
-It integrates **yFinance API** for data, **Plotly** for visualization, and **machine learning models** (ARIMA, SARIMA, Prophet, LSTM) for forecasting.
+A **cloud-deployed stock analytics dashboard** built using Streamlit, integrated with AWS services for scalable data processing and storage.
 
----
+This project enables users to:
 
-## 🎯 Objectives
-- Collect live financial data using yFinance.  
-- Provide interactive visualization of stock trends and technical indicators.  
-- Forecast stock prices using ARIMA, SARIMA, Prophet, and LSTM.  
-- Compare models using performance metrics (MAE, RMSE, MAPE, R², Directional Accuracy).  
-- Support multi-stock comparison and portfolio analysis.  
-- Deploy on cloud (EC2/Streamlit Cloud).  
+* Analyze Indian stock market data 📈
+* Perform forecasting using ML models 🤖
+* Export and store results directly to AWS S3 ☁️
 
 ---
 
-## 🏗️ System Architecture
-1. **Data Source:** Yahoo Finance via yFinance  
-2. **Preprocessing:** Cleaning, handling missing values, splitting train-test data  
-3. **Visualization:** Plotly charts, Moving Averages, RSI, Bollinger Bands  
-4. **Forecasting Models:** ARIMA, SARIMA, Prophet, LSTM  
-5. **Evaluation:** MAE, RMSE, MAPE, R², Directional Accuracy  
-6. **Interface:** Streamlit Dashboard  
+## 🌐 Live Demo
+
+👉 http://65.2.34.254:8501
 
 ---
 
-## ⚙️ Methodology
-1. **Data Collection** → Yahoo Finance API  
-2. **EDA** → Price charts, technical indicators  
-3. **Forecasting** → Apply ARIMA, SARIMA, Prophet, LSTM  
-4. **Evaluation** → Compare metrics  
-5. **Visualization** → Plotly + Streamlit UI  
+## 🏗️ Architecture
+
+User → Streamlit App (EC2) → AWS S3 (Storage)
+
+* **Frontend & Backend**: Streamlit
+* **Cloud Hosting**: AWS EC2
+* **Storage**: AWS S3
+* **Authentication**: IAM Role-based access (no credentials exposed)
 
 ---
 
-## 📊 Features
-- 📈 Real-time stock data retrieval  
-- 🔍 Technical indicators (MA, RSI, Bollinger Bands)  
-- 🤖 Forecasting with ARIMA, SARIMA, Prophet, LSTM  
-- 📊 Multi-stock comparison  
-- 💼 Portfolio analysis (returns, correlation heatmaps)  
-- 🌐 Streamlit-based deployment  
+## ✨ Features
+
+### 📈 Stock Analysis
+
+* Real-time stock data using yfinance
+* Candlestick charts and technical indicators
+* Multi-stock comparison
+
+### 🔮 Forecasting Models
+
+* ARIMA
+* SARIMA
+* Prophet
+* LSTM
+
+### 📰 Sentiment Analysis
+
+* News scraping from Yahoo Finance
+* Sentiment scoring using NLTK
+
+### 📊 Data Export
+
+* Download data as CSV / Excel
+* Upload results directly to AWS S3
+
+### ☁️ Cloud Integration
+
+* Secure S3 upload using IAM role
+* No hardcoded credentials
 
 ---
 
-## ✅ Results
-- Prophet & LSTM perform better for long-term predictions.  
-- ARIMA/SARIMA work well for short-term forecasts.  
-- Directional accuracy achieved between 55–70%.  
+## 🧰 Tech Stack
+
+* Python
+* Streamlit
+* Pandas, NumPy
+* Plotly
+* Scikit-learn
+* Statsmodels
+* TensorFlow (optional)
+* AWS (EC2, S3, IAM)
 
 ---
 
-## 🚀 Future Enhancements
-- Add news sentiment analysis for market movement prediction.  
-- Integrate reinforcement learning for trading strategies.  
-- Expand to cryptocurrency and commodities forecasting.  
-- Deploy on AWS/GCP with background auto-refresh jobs.  
+## ⚙️ Setup Instructions
+
+### 1️⃣ Clone Repository
+
+```bash
+git clone https://github.com/VijethAmin/my-stock-dashboard.git
+cd my-stock-dashboard
+```
+
+### 2️⃣ Create Virtual Environment
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 3️⃣ Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4️⃣ Run Application
+
+```bash
+streamlit run app.py
+```
 
 ---
 
-## 🛠️ Tech Stack
-- **Python**
-- **Libraries:** yFinance, Pandas, NumPy, Scikit-learn, Statsmodels, Prophet, TensorFlow/Keras, Plotly  
-- **Framework:** Streamlit  
-- **Deployment:** AWS EC2 / Streamlit Cloud  
+## ☁️ AWS Setup (Important)
+
+* Create S3 bucket
+* Create IAM role with `AmazonS3FullAccess`
+* Attach IAM role to EC2 instance
+
+👉 The app automatically uses IAM (no keys required)
 
 ---
 
-## 📚 References
-- Yahoo Finance API  
-- Facebook Prophet Documentation  
-- Time Series Forecasting (ARIMA, LSTM) Literature  
-- Streamlit Documentation  
+## 📂 Project Structure
+
+```
+my-stock-dashboard/
+│
+├── app.py
+├── venv/
+├── requirements.txt
+├── log.txt
+└── README.md
+```
+
+---
+
+## 📈 Future Enhancements
+
+* Add user authentication
+* Deploy using Docker
+* Integrate RDS for database storage
+* Add real-time streaming data
+
+---
+
+## 👨‍💻 Author
+
+**Vijeth Amin**
+
+* GitHub: https://github.com/VijethAmin
+
+---
+
+## ⭐ Acknowledgements
+
+* Yahoo Finance API (yfinance)
+* AWS Cloud Services
+* Open-source Python libraries
+
+---
+
+## ⚠️ Disclaimer
+
+This project is for educational purposes only and not financial advice.
