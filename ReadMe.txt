@@ -158,3 +158,19 @@ Forecast future price trends using multiple models.
 Stay updated with news sentiment affecting the stock.
 
 This project demonstrates end-to-end data acquisition, analysis, forecasting, visualization, and reporting, making it a strong tool for traders and analysts.
+
+
+
+code linux
+
+ls
+
+sudo apt update
+
+cd my-stock-dashboard
+
+source venv/bin/activate
+
+source venv/bin/activate
+
+streamlit run app.py
