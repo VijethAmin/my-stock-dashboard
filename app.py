@@ -16,26 +16,27 @@ from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
-
+import time
+ 
 warnings.filterwarnings('ignore')
-
+ 
 # --- Conditional Imports for Optional Libraries ---
 try:
     from streamlit_autorefresh import st_autorefresh
     HAS_AUTOREFRESH = True
 except ImportError:
     HAS_AUTOREFRESH = False
-
+ 
 try:
     from nltk.sentiment.vader import SentimentIntensityAnalyzer
 except ImportError:
     SentimentIntensityAnalyzer = None
-
+ 
 try:
     from prophet import Prophet
 except ImportError:
     Prophet = None
-
+ 
 try:
     import tensorflow as tf
     from tensorflow.keras.models import Sequential
@@ -45,9 +46,9 @@ try:
 except ImportError:
     tf = Sequential = LSTM = MinMaxScaler = None
     HAS_LSTM = False
-
+ 
 warnings.filterwarnings('ignore')
-
+ 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
@@ -57,7 +58,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
     page_icon="📊"
 )
-
+ 
 st.markdown("""
 <style>
 .main > div {padding-top: 2rem;}
@@ -93,10 +94,10 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
-
+ 
 st.markdown("# 📊 Indian Stock Market Dashboard")
 st.markdown("### Advanced Analysis • Forecasting • Sentiment • Portfolio")
-
+ 
 # ─────────────────────────────────────────────────────────────────────────────
 # NLTK VADER CHECK
 # ─────────────────────────────────────────────────────────────────────────────
@@ -110,80 +111,67 @@ if SentimentIntensityAnalyzer:
             except Exception as e:
                 st.error(f"Failed to download NLTK data: {e}")
                 SentimentIntensityAnalyzer = None
-
+ 
 # ─────────────────────────────────────────────────────────────────────────────
-# S3 CONFIGURATION  (reads from .streamlit/secrets.toml)
+# S3 CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────────────
 def _get_s3_config():
     return {
         "bucket": "my-cloud-project-vijeth",
         "region": "ap-south-1"
     }
-
-
+ 
+ 
 def _build_s3_client(cfg=None):
     return boto3.client("s3")
-
-
+ 
+ 
 def _s3_key(ticker: str, label: str, fmt: str) -> str:
-    """
-    Build an organised S3 key path.
-    Pattern: stocks/<TICKER>/<YYYY-MM-DD>/<label>.<fmt>
-    e.g.    stocks/RELIANCE/2026-04-13/price_data.csv
-    """
     date_str = datetime.now().strftime("%Y-%m-%d")
     return f"stocks/{ticker}/{date_str}/{label}.{fmt}"
-
-
+ 
+ 
 def upload_df_to_s3(
     df: pd.DataFrame,
     ticker: str,
     label: str,
-    fmt: str = "csv",          # "csv" or "json"
+    fmt: str = "csv",
     cfg: dict | None = None,
 ) -> tuple[bool, str]:
-    """
-    Serialise DataFrame and upload to S3.
-    Returns (success: bool, message: str).
-    """
     if cfg is None:
         return False, "S3 config missing"
     try:
-        # ── Serialise ──────────────────────────────────────────────────
         buf = BytesIO()
         df_exp = df.copy().reset_index()
-
-        # Strip timezone from any datetime columns (S3/JSON safety)
+ 
         for col in df_exp.select_dtypes(include=["datetimetz"]).columns:
             df_exp[col] = df_exp[col].dt.tz_localize(None)
         if isinstance(df_exp.index, pd.DatetimeIndex) and df_exp.index.tz:
             df_exp.index = df_exp.index.tz_localize(None)
-
+ 
         if fmt == "csv":
             buf.write(df_exp.to_csv(index=False).encode("utf-8"))
             content_type = "text/csv"
-        else:  # json
+        else:
             buf.write(
                 df_exp.where(pd.notna(df_exp), None)
                       .to_json(orient="records", date_format="iso", indent=2)
                       .encode("utf-8")
             )
             content_type = "application/json"
-
+ 
         buf.seek(0)
-
-        # ── Upload ─────────────────────────────────────────────────────
-        s3     = _build_s3_client(cfg)
-        key    = _s3_key(ticker, label, fmt)
+        s3  = _build_s3_client(cfg)
+        key = _s3_key(ticker, label, fmt)
         s3.put_object(
-            Bucket      = cfg["bucket"],
-            Key         = key,
-            Body        = buf.getvalue(),
-            ContentType = content_type,
+            Bucket=cfg["bucket"],
+            Key=key,
+            Body=buf.getvalue(),
+            ContentType=content_type,
         )
         s3_url = f"s3://{cfg['bucket']}/{key}"
         return True, s3_url
-
+ 
     except NoCredentialsError:
         return False, "AWS credentials are invalid or expired."
     except ClientError as e:
@@ -192,8 +180,8 @@ def upload_df_to_s3(
         return False, f"S3 error [{code}]: {msg}"
     except Exception as e:
         return False, f"Unexpected error: {e}"
-
-
+ 
+ 
 # ─────────────────────────────────────────────────────────────────────────────
 # REUSABLE UI COMPONENT
 # ─────────────────────────────────────────────────────────────────────────────
@@ -203,16 +191,12 @@ def s3_upload_section(
     label: str,
     s3_cfg: dict | None,
 ):
-    """
-    Renders the '☁️ Upload to S3' row (format picker + button + status).
-    Drops into any export section with one call.
-    """
     if s3_cfg is None:
         st.caption(
             "☁️ S3 upload unavailable — add `[aws]` credentials to `.streamlit/secrets.toml`"
         )
         return
-
+ 
     col_fmt, col_btn = st.columns([1, 3])
     with col_fmt:
         fmt = st.selectbox(
@@ -237,38 +221,34 @@ def s3_upload_section(
                     f'<div class="s3-error">❌ Upload failed: {msg}</div>',
                     unsafe_allow_html=True,
                 )
-
-
+ 
+ 
 # ─────────────────────────────────────────────────────────────────────────────
-# DOWNLOAD + S3 BUTTONS  (replaces the old create_download_buttons)
+# DOWNLOAD + S3 BUTTONS
 # ─────────────────────────────────────────────────────────────────────────────
 def create_download_buttons(
     df: pd.DataFrame,
     filename_prefix: str,
-    ticker: str = "DATA",       # used for S3 folder path
-    label: str  = "",           # used for S3 file name (defaults to filename_prefix)
+    ticker: str = "DATA",
+    label: str  = "",
     s3_cfg: dict | None = None,
 ):
-    """
-    Renders three action buttons in a row:
-      [📥 CSV]  [📥 Excel]  [☁️ Upload to S3]
-    """
     label = label or filename_prefix
     stamp = datetime.now().strftime("%Y%m%d")
-
+ 
     col1, col2, col3 = st.columns(3)
-
-    # ── CSV download ───────────────────────────────────────────────────
+ 
     with col1:
         csv = df.to_csv(index=True).encode("utf-8")
         st.download_button(
-            "📥 Download CSV", csv,
+            "📥 Download CSV",
+            csv,
             f"{filename_prefix}_{stamp}.csv",
             mime="text/csv",
             use_container_width=True,
+            key=f"csv_{filename_prefix}_{ticker}_{time.time()}"
         )
-
-    # ── Excel download ─────────────────────────────────────────────────
+ 
     with col2:
         buf = BytesIO()
         df_exp = df.copy()
@@ -283,9 +263,9 @@ def create_download_buttons(
             f"{filename_prefix}_{stamp}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
+            key=f"excel_{filename_prefix}_{ticker}_{time.time()}"
         )
-
-    # ── S3 upload ──────────────────────────────────────────────────────
+ 
     with col3:
         if s3_cfg is None:
             st.button("☁️ S3 (not configured)", disabled=True,
@@ -301,22 +281,21 @@ def create_download_buttons(
                     st.success(f"✅ `{msg}`")
                 else:
                     st.error(f"❌ {msg}")
-
-
+ 
+ 
 # ─────────────────────────────────────────────────────────────────────────────
 # SIDEBAR
 # ─────────────────────────────────────────────────────────────────────────────
-# Read S3 config once at startup — shared across all export sections
 S3_CFG = _get_s3_config()
-
+ 
 with st.sidebar:
     st.markdown("## 🔧 Configuration")
     st.markdown("### 📈 Stock Selection")
-
+ 
     tickers_input = st.text_input(
         "Enter NSE stock symbols (comma separated)", "RELIANCE,TCS,INFY,HDFCBANK"
     )
-
+ 
     popular_stocks = {
         "FAANG of India":  "RELIANCE,TCS,INFY,HDFCBANK,ITC",
         "Banking Stocks":  "HDFCBANK,ICICIBANK,SBIN,KOTAKBANK,AXISBANK",
@@ -327,27 +306,30 @@ with st.sidebar:
     if preset != "Custom":
         tickers_input = popular_stocks[preset]
         st.info(f"Selected: {preset}")
-
+ 
     tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
     symbols = [f"{t}.NS" for t in tickers]
-
+ 
     st.markdown("### 📊 Analysis Mode")
     mode = st.radio(
         "Select mode",
         ["Single Stock Analysis", "Multi-Stock Comparison", "Portfolio Analysis"],
         index=1 if len(symbols) > 1 else 0,
     )
-
+ 
     st.markdown("### 🔮 Forecasting")
     forecast_options = ["None", "ARIMA", "SARIMA"]
+ 
     if Prophet:
         forecast_options.append("Prophet")
     if HAS_LSTM:
         forecast_options.append("LSTM")
-
+ 
+    forecast_options.append("Compare All Models")
+ 
     forecast_method = st.selectbox("Forecast method", forecast_options)
     forecast_days   = st.slider("Forecast horizon (days)", 5, 365, 30, step=5)
-
+ 
     st.markdown("### ⚙️ Settings")
     period_options = {
         "1 Month": "1mo", "3 Months": "3mo", "6 Months": "6mo",
@@ -356,29 +338,28 @@ with st.sidebar:
     period      = period_options[st.selectbox("Data period", list(period_options.keys()), index=4)]
     show_volume = st.checkbox("Show volume data", value=True)
     show_news   = st.checkbox("Show news & sentiment", value=True)
-
+ 
     refresh_rate = st.slider("Auto-refresh (seconds, 0 = off)", 0, 300, 0)
     if refresh_rate > 0:
         if HAS_AUTOREFRESH:
             st_autorefresh(interval=refresh_rate * 1000, key="refresh")
         else:
             st.warning("Install `streamlit-autorefresh` for auto-refresh.")
-
-    # ── S3 status indicator in sidebar ────────────────────────────────
+ 
     st.markdown("---")
     st.markdown("### ☁️ AWS S3")
     if S3_CFG:
         st.success(f"✅ Connected\n\nBucket: `{S3_CFG['bucket']}`\nRegion: `{S3_CFG['region']}`")
     else:
         st.warning("Not configured.\nAdd `[aws]` block to `.streamlit/secrets.toml`")
-
+ 
     st.markdown("---")
     st.markdown("### 📋 Current Selection")
     for i, ticker in enumerate(tickers, 1):
         st.markdown(f"{i}. **{ticker}**")
-
+ 
 st.session_state["current_tickers"] = tickers
-
+ 
 # ─────────────────────────────────────────────────────────────────────────────
 # DATA FUNCTIONS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -398,8 +379,8 @@ def load_data(ticker: str, period: str):
     except Exception as e:
         st.error(f"Error loading {ticker}: {e}")
         return None, None
-
-
+ 
+ 
 def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df["SMA20"]  = df["Close"].rolling(20).mean()
@@ -436,8 +417,8 @@ def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
     conditions_sell = (df["RSI"] > 65) & (df["MACD"] < df["Signal"])
     df["Signal_Flag"] = np.where(conditions_buy, 1, np.where(conditions_sell, -1, 0))
     return df
-
-
+ 
+ 
 def compute_metrics(actual, predicted) -> dict:
     mae  = mean_absolute_error(actual, predicted)
     rmse = np.sqrt(mean_squared_error(actual, predicted))
@@ -449,8 +430,8 @@ def compute_metrics(actual, predicted) -> dict:
     r2     = 1 - ss_res / ss_tot if ss_tot else 0
     dir_acc = np.mean((np.diff(a) > 0) == (np.diff(p) > 0)) * 100 if len(a) > 1 else 0
     return {"MAE": mae, "RMSE": rmse, "MAPE": mape, "R²": r2, "Direction Accuracy (%)": dir_acc}
-
-
+ 
+ 
 # ─────────────────────────────────────────────────────────────────────────────
 # NEWS / SENTIMENT
 # ─────────────────────────────────────────────────────────────────────────────
@@ -489,8 +470,8 @@ def get_news(ticker: str, max_articles: int = 10) -> list:
     except Exception:
         pass
     return []
-
-
+ 
+ 
 # ─────────────────────────────────────────────────────────────────────────────
 # FORECASTING FUNCTIONS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -518,8 +499,8 @@ def forecast_prophet(df: pd.DataFrame, periods: int):
     except Exception as e:
         st.error(f"Prophet error: {e}")
         return None
-
-
+ 
+ 
 def forecast_lstm(df: pd.DataFrame, periods: int, epochs: int = 50, batch_size: int = 32):
     if not HAS_LSTM:
         st.error("TensorFlow/Keras is not installed.")
@@ -578,8 +559,8 @@ def forecast_lstm(df: pd.DataFrame, periods: int, epochs: int = 50, batch_size: 
     except Exception as e:
         st.error(f"LSTM error: {e}")
         return None
-
-
+ 
+ 
 def forecast_arima(df_indexed: pd.DataFrame, periods: int, order=(5, 1, 0)):
     try:
         series = df_indexed["Close"].dropna().copy()
@@ -601,8 +582,8 @@ def forecast_arima(df_indexed: pd.DataFrame, periods: int, order=(5, 1, 0)):
     except Exception as e:
         st.error(f"ARIMA error: {e}")
         return None
-
-
+ 
+ 
 def forecast_sarima(df_indexed: pd.DataFrame, periods: int,
                     order=(2, 1, 2), seasonal_order=(1, 1, 1, 12)):
     try:
@@ -626,12 +607,17 @@ def forecast_sarima(df_indexed: pd.DataFrame, periods: int,
     except Exception as e:
         st.error(f"SARIMA error: {e}")
         return None
-
-
+ 
+ 
+# ─────────────────────────────────────────────────────────────────────────────
+# FIX 1: Single, clean definition of run_forecast (was duplicated before)
+# ─────────────────────────────────────────────────────────────────────────────
 def run_forecast(df: pd.DataFrame, method: str, days: int):
     df2 = df.set_index("Date").copy()
     if method == "Prophet":
-        return forecast_prophet(df.rename(columns={"Date": "ds", "Close": "y"}), days)
+        return forecast_prophet(
+            df.rename(columns={"Date": "ds", "Close": "y"}), days
+        )
     elif method == "LSTM":
         return forecast_lstm(df, days)
     elif method == "ARIMA":
@@ -639,8 +625,49 @@ def run_forecast(df: pd.DataFrame, method: str, days: int):
     elif method == "SARIMA":
         return forecast_sarima(df2, days)
     return None
-
-
+ 
+ 
+# ─────────────────────────────────────────────────────────────────────────────
+# FIX 2: Single, clean definition of compare_all_models (was duplicated before)
+# ─────────────────────────────────────────────────────────────────────────────
+def compare_all_models(df: pd.DataFrame, forecast_days: int):
+    models = ["ARIMA", "SARIMA"]
+    if Prophet:
+        models.append("Prophet")
+    if HAS_LSTM:
+        models.append("LSTM")
+ 
+    results   = []
+    forecasts = {}
+ 
+    split_idx = int(len(df) * 0.8)
+    train_df  = df.iloc[:split_idx].copy()
+    test_df   = df.iloc[split_idx:].copy()
+    actual    = test_df["Close"].values
+ 
+    for model in models:
+        try:
+            forecast = run_forecast(train_df, model, len(test_df))
+            if forecast is not None and not forecast.empty:
+                pred    = forecast["Forecast"].values
+                min_len = min(len(actual), len(pred))
+                metrics = compute_metrics(actual[:min_len], pred[:min_len])
+                forecasts[model] = forecast
+                results.append({
+                    "Model":                  model,
+                    "MAE":                    round(metrics["MAE"],  2),
+                    "RMSE":                   round(metrics["RMSE"], 2),
+                    "MAPE":                   round(metrics["MAPE"], 2),
+                    "R²":                     round(metrics["R²"],   4),
+                    "Direction Accuracy (%)": round(metrics["Direction Accuracy (%)"], 2),
+                })
+        except Exception as e:
+            st.warning(f"{model} failed: {e}")
+ 
+    comparison_df = pd.DataFrame(results)
+    return comparison_df, forecasts
+ 
+ 
 def plot_forecast(df, result, ticker, method):
     fig = go.Figure()
     fig.add_trace(go.Scatter(
@@ -663,15 +690,15 @@ def plot_forecast(df, result, ticker, method):
         height=500, template="plotly_white",
     )
     return fig
-
-
+ 
+ 
 # ─────────────────────────────────────────────────────────────────────────────
 # EARLY-EXIT IF NO TICKERS
 # ─────────────────────────────────────────────────────────────────────────────
 if not tickers:
     st.info("👉 Enter stock symbols in the sidebar to begin.")
     st.stop()
-
+ 
 # ═════════════════════════════════════════════════════════════════════════════
 # SINGLE STOCK ANALYSIS
 # ═════════════════════════════════════════════════════════════════════════════
@@ -682,17 +709,17 @@ if mode == "Single Stock Analysis":
             "Switch to *Multi-Stock Comparison* to analyse all."
         )
     ticker, symbol = tickers[0], symbols[0]
-
+ 
     with st.spinner(f"Loading **{ticker}**…"):
         df, info = load_data(symbol, period)
-
+ 
     if df is None:
         st.error(f"Could not load **{ticker}**.")
         st.stop()
-
+ 
     df = add_technical_indicators(df)
     st.markdown(f"## 📈 {ticker} — Detailed Analysis")
-
+ 
     if info:
         cur   = info.get("currentPrice",  df["Close"].iloc[-1])
         prev  = info.get("previousClose", df["Close"].iloc[-2] if len(df) >= 2 else None)
@@ -700,7 +727,7 @@ if mode == "Single Stock Analysis":
         pe    = info.get("trailingPE",    None)
         wk52h = info.get("fiftyTwoWeekHigh", None)
         wk52l = info.get("fiftyTwoWeekLow",  None)
-
+ 
         col1, col2, col3, col4, col5, col6 = st.columns(6)
         with col1:
             if prev and prev != 0:
@@ -719,13 +746,14 @@ if mode == "Single Stock Analysis":
             st.metric("📅 52W High", f"₹{wk52h:.2f}" if isinstance(wk52h, float) else "N/A")
         with col6:
             st.metric("📅 52W Low",  f"₹{wk52l:.2f}" if isinstance(wk52l, float) else "N/A")
-
+ 
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📊 Price Chart", "📈 Indicators & Signals",
         "🔮 Forecasting", "📰 News & Sentiment",
         "📋 Data Export", "ℹ️ Stock Info",
     ])
-
+ 
+    # ── Tab 1: Price Chart ─────────────────────────────────────────────
     with tab1:
         st.subheader("Candlestick Price Chart")
         rows = 2 if show_volume else 1
@@ -756,7 +784,8 @@ if mode == "Single Stock Analysis":
         fig.update_layout(height=700, template="plotly_white",
                           legend=dict(orientation="h", yanchor="bottom", y=1.02))
         st.plotly_chart(fig, use_container_width=True)
-
+ 
+    # ── Tab 2: Indicators & Signals ────────────────────────────────────
     with tab2:
         st.subheader("Technical Indicators")
         ind_tabs = st.tabs(["RSI", "MACD", "Stochastic", "ATR", "🚦 Signals"])
@@ -829,17 +858,40 @@ if mode == "Single Stock Analysis":
             fig_sig.update_layout(title="Buy/Sell Signals", template="plotly_white", height=450)
             st.plotly_chart(fig_sig, use_container_width=True)
             col_b, col_s = st.columns(2)
-            col_b.metric("🟢 Buy Signals", len(buy_df))
+            col_b.metric("🟢 Buy Signals",  len(buy_df))
             col_s.metric("🔴 Sell Signals", len(sell_df))
             st.caption("⚠️ For educational purposes only — not financial advice.")
-
+ 
+    # ── Tab 3: Forecasting ─────────────────────────────────────────────
+    # FIX 3: tab3/tab4/tab5/tab6 all at the same indentation level (were nested before)
     with tab3:
         if forecast_method == "None":
             st.info("Select a forecasting method in the sidebar.")
+        elif forecast_method == "Compare All Models":
+            st.subheader("📊 Model Comparison")
+            with st.spinner("Running all models…"):
+                comp_df, comp_forecasts = compare_all_models(df, forecast_days)
+            if not comp_df.empty:
+                st.dataframe(comp_df.set_index("Model"), use_container_width=True)
+                fig_comp = go.Figure()
+                fig_comp.add_trace(go.Scatter(
+                    x=df["Date"], y=df["Close"], name="Historical",
+                    line=dict(color="#1f77b4")))
+                for mdl, res in comp_forecasts.items():
+                    fig_comp.add_trace(go.Scatter(
+                        x=res.index, y=res["Forecast"],
+                        name=mdl, line=dict(dash="dash")))
+                fig_comp.update_layout(
+                    title=f"{ticker} — All Model Forecasts",
+                    xaxis_title="Date", yaxis_title="Price (₹)",
+                    height=500, template="plotly_white")
+                st.plotly_chart(fig_comp, use_container_width=True)
+            else:
+                st.warning("No models produced results.")
         else:
-            st.subheader(f"🔮 {forecast_method} Forecast — {forecast_days} days")
             with st.spinner(f"Running {forecast_method}…"):
                 result = run_forecast(df, forecast_method, forecast_days)
+ 
             if result is not None and not result.empty:
                 st.plotly_chart(plot_forecast(df, result, ticker, forecast_method),
                                 use_container_width=True)
@@ -850,6 +902,7 @@ if mode == "Single Stock Analysis":
                 c1.metric(f"In {forecast_days} days", f"₹{fwd_p:.2f}", f"{pct_ch:+.2f}%")
                 c2.metric("Forecast High", f"₹{result['Forecast'].max():.2f}")
                 c3.metric("Forecast Low",  f"₹{result['Forecast'].min():.2f}")
+ 
                 df_idx  = df.set_index("Date")
                 overlap = result.join(df_idx[["Close"]], how="inner")
                 if len(overlap) > 1:
@@ -859,13 +912,12 @@ if mode == "Single Stock Analysis":
                     for i, (name, val) in enumerate(metrics.items()):
                         with met_cols[i]:
                             if isinstance(val, float) and not np.isnan(val):
-                                fmt = f"{val:.4f}" if name == "R²" else \
-                                      f"{val:.2f}%" if "%" in name else f"{val:.2f}"
+                                fmt = (f"{val:.4f}" if name == "R²" else
+                                       f"{val:.2f}%" if "%" in name else f"{val:.2f}")
                                 st.metric(name, fmt)
                             else:
                                 st.metric(name, "N/A")
-
-                # ── Forecast export (CSV + Excel + S3) ────────────────
+ 
                 st.markdown("#### 📥 Export Forecast")
                 create_download_buttons(
                     result,
@@ -875,8 +927,12 @@ if mode == "Single Stock Analysis":
                     s3_cfg=S3_CFG,
                 )
             else:
-                st.error("Forecast could not be generated.")
-
+                st.error(
+                    f"The {forecast_method} model could not generate a forecast. "
+                    "This usually happens if there is insufficient historical data."
+                )
+ 
+    # ── Tab 4: News & Sentiment ────────────────────────────────────────
     with tab4:
         if not show_news:
             st.info("Enable 'Show news & sentiment' in sidebar.")
@@ -894,7 +950,8 @@ if mode == "Single Stock Analysis":
                 for title, link in news_items:
                     s = sid.polarity_scores(title)
                     c = s["compound"]
-                    lbl = "🟢 Positive" if c > 0.05 else ("🔴 Negative" if c < -0.05 else "⚪ Neutral")
+                    lbl = ("🟢 Positive" if c > 0.05 else
+                           "🔴 Negative" if c < -0.05 else "⚪ Neutral")
                     sentiment_data.append({"Title": title, "Link": link,
                                            "Sentiment": lbl, "Score": c})
                 for item in sentiment_data:
@@ -904,12 +961,14 @@ if mode == "Single Stock Analysis":
                     st.markdown("---")
                 scores  = [d["Score"] for d in sentiment_data]
                 avg     = np.mean(scores)
-                lbl_avg = ("Very Positive" if avg > 0.3 else "Positive" if avg > 0.05 else
-                           "Neutral" if avg >= -0.05 else "Negative" if avg > -0.3 else "Very Negative")
+                lbl_avg = ("Very Positive" if avg > 0.3 else
+                           "Positive"      if avg > 0.05 else
+                           "Neutral"       if avg >= -0.05 else
+                           "Negative"      if avg > -0.3 else "Very Negative")
                 sc1, sc2, sc3 = st.columns(3)
-                sc1.metric("🟢 Positive", sum(s > 0.05  for s in scores))
+                sc1.metric("🟢 Positive", sum(s > 0.05       for s in scores))
                 sc2.metric("⚪ Neutral",  sum(-0.05 <= s <= 0.05 for s in scores))
-                sc3.metric("🔴 Negative", sum(s < -0.05 for s in scores))
+                sc3.metric("🔴 Negative", sum(s < -0.05      for s in scores))
                 fig_sent = go.Figure(go.Bar(
                     x=["Positive", "Neutral", "Negative"],
                     y=[sum(s > 0.05 for s in scores),
@@ -921,18 +980,18 @@ if mode == "Single Stock Analysis":
                                        template="plotly_white", height=300)
                 st.plotly_chart(fig_sent, use_container_width=True)
                 st.info(f"**Average Sentiment**: {avg:.3f} → {lbl_avg}")
-
+ 
     # ── Tab 5: Data Export ─────────────────────────────────────────────
     with tab5:
         st.subheader("📋 Data Export")
         st.dataframe(df.tail(10), use_container_width=True)
-
+ 
         export_opts = st.multiselect(
             "Select data to export:",
             ["Price Data", "Technical Indicators"],
             default=["Price Data"],
         )
-
+ 
         if "Price Data" in export_opts:
             st.markdown("#### 📊 Price Data")
             price_df = df[["Date", "Open", "High", "Low", "Close", "Volume"]].set_index("Date")
@@ -943,12 +1002,10 @@ if mode == "Single Stock Analysis":
                 label="price_data",
                 s3_cfg=S3_CFG,
             )
-
-            # ── JSON upload option (price data only) ──────────────────
             if S3_CFG:
                 st.markdown("**☁️ Upload as JSON to S3:**")
                 s3_upload_section(price_df, ticker, "price_data_json", S3_CFG)
-
+ 
         if "Technical Indicators" in export_opts:
             st.markdown("#### 📈 Technical Indicators")
             excl = {"Date", "Open", "High", "Low", "Close", "Volume", "Dividends", "Stock Splits"}
@@ -961,8 +1018,7 @@ if mode == "Single Stock Analysis":
                 label="technical_indicators",
                 s3_cfg=S3_CFG,
             )
-
-        # ── S3 bucket browser (shows what's already uploaded) ─────────
+ 
         if S3_CFG:
             with st.expander("🗂️ View files already in S3 for this ticker"):
                 try:
@@ -982,7 +1038,8 @@ if mode == "Single Stock Analysis":
                         st.info(f"No files yet at `s3://{S3_CFG['bucket']}/{prefix}`")
                 except Exception as e:
                     st.warning(f"Could not list S3 objects: {e}")
-
+ 
+    # ── Tab 6: Stock Info ──────────────────────────────────────────────
     with tab6:
         st.subheader("ℹ️ Company Information")
         if info:
