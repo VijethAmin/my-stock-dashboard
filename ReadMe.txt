@@ -162,7 +162,8 @@ This project demonstrates end-to-end data acquisition, analysis, forecasting, vi
 
 
 code linux
-
+                                               cd ~/my-stock-dashboard/my-stock-dashboard
+                                             rm app.py   to remove 
 ls  & nana app.py
 
 sudo apt update
