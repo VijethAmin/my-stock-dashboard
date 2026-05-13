@@ -163,7 +163,7 @@ This project demonstrates end-to-end data acquisition, analysis, forecasting, vi
 
 code linux
 
-ls
+ls  & nana app.py
 
 sudo apt update
 
