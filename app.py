@@ -816,8 +816,6 @@ elif mode == "Portfolio Analysis":
                 template="plotly_white", height=350)
             st.plotly_chart(fig_roll, width="stretch")
         create_download_buttons(ret_df, "portfolio_returns", "PORTFOLIO", "returns", S3_CFG)
-
-=======
  
 st.markdown("""
 <style>
