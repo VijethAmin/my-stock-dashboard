@@ -2,6 +2,8 @@
 
 An interactive Streamlit dashboard for NSE stock analysis, forecasting, sentiment analysis, portfolio comparison, and data export.
 
+LINK TO ACCESS-->  https://my-stock-dashboard-bpft3opdwikmpvygboxaen.streamlit.app/
+
 ## Overview
 
 This project provides a single web dashboard for investors, traders, and analysts to monitor Indian stock market data. It uses Yahoo Finance data through `yfinance`, interactive Plotly charts, technical indicators, news sentiment analysis, and multiple forecasting models.
