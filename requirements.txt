@@ -1,0 +1,15 @@
+# requirements.txt
+yfinance
+streamlit
+plotly
+pandas
+numpy
+nltk
+scikit-learn
+statsmodels
+
+prophet
+streamlit-autorefresh
+beautifulsoup4
+xlsxwriter
+boto3
