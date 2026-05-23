@@ -19,7 +19,6 @@ except ImportError:
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
->>>>>>> 5de9da39a1f93df75d86b0f1bfdf8fc91508256d
 st.set_page_config(
     page_title="Indian Stock Dashboard",
     layout="wide",
@@ -40,7 +39,6 @@ from services.market_data import load_data, parse_tickers, to_nse_symbol
 from services.news import SentimentIntensityAnalyzer, get_news
 from services.s3 import build_s3_client, get_s3_config
 from ui.downloads import create_download_buttons, s3_upload_section
-<<<<<<< HEAD
  
 st.markdown("""
 <style>
