@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # requirements.txt
 yfinance
 streamlit
@@ -10,6 +11,20 @@ statsmodels
 
 prophet
 streamlit-autorefresh
+=======
+# requirements.txt
+yfinance
+streamlit
+plotly
+pandas
+numpy
+nltk
+scikit-learn
+statsmodels
+tensorflow  # or torch for LSTM
+prophet
+streamlit-autorefresh
+>>>>>>> 5de9da39a1f93df75d86b0f1bfdf8fc91508256d
 beautifulsoup4
 xlsxwriter
 boto3

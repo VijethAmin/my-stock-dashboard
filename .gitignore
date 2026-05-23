@@ -1,7 +1,16 @@
+<<<<<<< HEAD
 venv/
 .venv/
 __pycache__/
 *.pyc
 .streamlit/secrets.toml
 secrets.toml
+=======
+venv/
+.venv/
+__pycache__/
+*.pyc
+.streamlit/secrets.toml
+secrets.toml
+>>>>>>> 5de9da39a1f93df75d86b0f1bfdf8fc91508256d
 *.log
