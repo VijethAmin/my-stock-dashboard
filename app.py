@@ -19,28 +19,6 @@ except ImportError:
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
-=======
-﻿import streamlit as st
-import pandas as pd
-import plotly.graph_objs as go
-import plotly.express as px
-from plotly.subplots import make_subplots
-import numpy as np
-import warnings
-import nltk
- 
-warnings.filterwarnings('ignore')
- 
-# --- Conditional Imports for Optional Libraries ---
-try:
-    from streamlit_autorefresh import st_autorefresh
-    HAS_AUTOREFRESH = True
-except ImportError:
-    HAS_AUTOREFRESH = False
- 
-# ─────────────────────────────────────────────────────────────────────────────
-# PAGE CONFIG
-# ─────────────────────────────────────────────────────────────────────────────
 >>>>>>> 5de9da39a1f93df75d86b0f1bfdf8fc91508256d
 st.set_page_config(
     page_title="Indian Stock Dashboard",
